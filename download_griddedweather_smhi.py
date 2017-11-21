@@ -21,7 +21,7 @@ def download_griddedweather_smhi(from_datetime, to_datetime, prod, download_fold
         t_iter+=datetime.timedelta(days=1)
     #Builds request urls, make the request and reads filenames from response 
     dtype=prod2num(prod) #MESAN-A
-downdownloaded_files=[]
+    downdownloaded_files=[]
     for d in dates:
         req_url=base_url+dtype+'/'+str(d.year)+'/'+str(d.month)+'/'+str(d.day)
         r=requests.get(req_url)
