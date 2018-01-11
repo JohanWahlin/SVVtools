@@ -231,7 +231,7 @@ def parse_dau(filename,add_geometry=False):
                                     'TotalDistans_m_Vatspreder','VatsprederAktiv','Spredesymmetri','ForvententBrukTorr','ForventetBrukVat','Saltresidual',
                                     'MaterialType_kode','Friktion','VegTemperature','LuftTemperature','Luftfuktighet','road_condition','weather_condition','cloud_cover','mounted_sensors','from_vegref','to_vegref','graderblade_active','midtskjaer_active','sideplog_active','dry_amount_weightsys','wet_amount_weightsys','segment_length','SegmentTime','SegmentDrySalt','SegmentSolution','Segment_TheoDrySalt','Segment_TheoSolution','Flag'])	
         
-        pd.set_option('use_inf_as_null', True)
+        pd.set_option('use_inf_as_na', True)
         #df[df.isnull()]=np.nan
         df=df.where(pd.notnull(df), None)
         #df.replace([np.inf, -np.inf],None, inplace=True)
