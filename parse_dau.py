@@ -16,10 +16,17 @@ import numpy as np
 import fnmatch
 import os
 import codecs
+import datetime
 
 
-data=[]
+
 def parse_dau(filename,add_geometry=False):
+        def trial(a):
+            if a==None:
+                return(0)
+            else:
+                return(a)
+        data=[]
         file = codecs.open(filename, 'rb', 'cp1252')
         i = 0
         for nextline in file:
@@ -41,6 +48,7 @@ def parse_dau(filename,add_geometry=False):
                 elif code == '931105' or code == '931106' or code == '931107' or code == '931108':  # These are different versions of the DAU format, and should be parsed differently
                     line = line.replace(',','.')
                     line = line.strip()
+                    line = line.replace('INF','')
                     nextline = nextline.replace(',','.')
                     nextline=nextline.strip()
                     stat=line_columns[3]  #extract the measurement status. If 'begin' it is the first line of a "measurement". If 'end' it is the last line, and thereby the end point of a "measurement"
@@ -118,28 +126,39 @@ def parse_dau(filename,add_geometry=False):
                             
                         # Finds the end-point of this row (start point in next row) and calculates segment distance
                         splitted_nextline=nextline.split(';')
+                        next_date = splitted_nextline[1]
+                        next_time = splitted_nextline[2]
                         next_vegref=splitted_nextline[34]
                         next_dist=splitted_nextline[6]
                         segm_length=float(next_dist)-float(dist)
                         next_lat=splitted_nextline[4]
                         next_lon=splitted_nextline[5]
-                           
+                        next_teo_salt_dry=splitted_nextline[12]
+                        next_teo_salt_wet=splitted_nextline[18]
+                        next_timestamp=next_date[0:4]+'-'+next_date[4:6]+'-'+next_date[6:] +' '+next_time[0:2]+':'+next_time[2:4]+':'+next_time[4:]
+                        #print(next_timestamp)
                     
                         '''Read data is then treated the same way, and written to db in the same way'''
                         if material_type != None:
-                            material_type=int(material_type)
-                        if plog_nede_bool not in [0,1]:
-                            plog_nede_bool=None
-                        if torr_spreder_bruk_bool not in [0,1]:
-                            torr_spreder_bruk_bool=None
-                        if vat_spreder_bruk_bool not in [0,1]:
-                            vat_spreder_bruk_bool=None
-                        if hovel_nede_bool not in [0,1]:
-                            hovel_nede_bool=None
-                        if midskjer_nede_bool not in [0,1]:
-                            midskjer_nede_bool=None
-                        if sideplog_bruk_bool not in [0,1]:
-                            sideplog_bruk_bool=None
+                            material_type=float(material_type)
+                        if plog_nede_bool != None:
+                            if float(plog_nede_bool) not in [0,1,'0','1']:
+                                plog_nede_bool=None
+                        if torr_spreder_bruk_bool != None:
+                            if float(torr_spreder_bruk_bool) not in [0,1]:
+                                torr_spreder_bruk_bool=None
+                        if vat_spreder_bruk_bool != None:
+                            if float(vat_spreder_bruk_bool) not in [0,1]:
+                                vat_spreder_bruk_bool=None
+                        if hovel_nede_bool != None:
+                            if float(hovel_nede_bool) not in [0,1]:
+                                hovel_nede_bool=None
+                        if midskjer_nede_bool != None:
+                            if float(midskjer_nede_bool) not in [0,1]:
+                                midskjer_nede_bool=None
+                        if sideplog_bruk_bool != None:
+                            if float(sideplog_bruk_bool) not in [0,1]:
+                                sideplog_bruk_bool=None
                         
                         timestamp = date[0:4]+'-'+date[4:6]+'-'+date[6:] +' '+time[0:2]+':'+time[2:4]+':'+time[4:] #date and time into sql timestamp
                         header_timestamp = header_date[0:4]+'-'+header_date[4:6]+'-'+header_date[6:] +' '+header_time[0:2]+':'+header_time[2:4]+':'+header_time[4:]
@@ -147,15 +166,53 @@ def parse_dau(filename,add_geometry=False):
                         lon=float(lon)*180/np.pi #lon from radians to decimal degrees
                         next_lat=float(next_lat)*180/np.pi #lat from radians to decimal degrees
                         next_lon=float(next_lon)*180/np.pi #lon from radians to decimal degrees
+                        #print(timestamp)
+                        seg_time=datetime.datetime.strptime(next_timestamp,'%Y-%m-%d %H:%M:%S')-datetime.datetime.strptime(timestamp,'%Y-%m-%d %H:%M:%S') # in deltatime
+                        seg_time=seg_time.total_seconds() #segment time in seconds
+                        
+                        try:
+                            seg_dry_salt=(float(dosering_torr)*float(sprederbredde_torr)/100*segm_length*1000)/1000 #kg
+                        except:
+                            seg_dry_salt=None
+                        try:
+                            seg_solution=(float(dosering_vat)*float(sprederbredde_vat)/100*segm_length*1000)/1000 #liter
+                        except:
+                            seg_solution=None
+                        try:
+                            seg_teodrysalt=float(next_teo_salt_dry)-float(teo_mengde_torrstoff)
+                        except:
+                            seg_teodrysalt=None
 
+                        try:
+                            seg_teowetsalt=float(next_teo_salt_wet)-float(teo_mengde_vatstoff)
+                        except:   
+                            seg_teowetsalt=None
+
+                        if seg_teowetsalt!=None:
+                            if np.isnan(seg_teowetsalt):
+                                print([filename,timestamp, status,sprederbredde_torr,dosering_torr,teo_mengde_torrstoff,torr_spreder_bruk_bool,
+                                                                             sprederbredde_vat,dosering_vat,teo_mengde_vatstoff,vat_spreder_bruk_bool,
+                                                                             material_type,mengd_torrt_veiesys,mengd_vatt_veiesys,segm_length,seg_time,seg_dry_salt,seg_solution,seg_teodrysalt,seg_teowetsalt])
+                        
+
+                                
+                        if segm_length>0:
+                            if trial(seg_dry_salt)/segm_length>250 or trial(seg_solution)/segm_length>250 or trial(seg_teodrysalt)/segm_length>250 or trial(seg_teowetsalt)/segm_length>250:
+                                flag=1.0
+                            else:
+                                flag=0.0
+                        else:
+                            flag=2.0
+                        
+                        
                         '''append data to list'''
-                        data.append([header_timestamp,vehicle_id,code, timestamp, status,lat,lon,next_lat, next_lon, dist,speed,dist_m_spreder_torr,sprederbredde_torr,
+                        data.append([filename,header_timestamp,vehicle_id,code, timestamp, status,lat,lon,next_lat, next_lon, dist,speed,dist_m_spreder_torr,sprederbredde_torr,
                                                                          dosering_torr,prc_vatstoff_tillsatt,teo_mengde_torrstoff,tot_bruk_vatstoff,torr_spreder_bruk_bool,
                                                                          plog_nede_bool,sprederbredde_vat,dosering_vat,teo_mengde_vatstoff,dist_m_spreder_vat,
                                                                          vat_spreder_bruk_bool,spredesymmetri,forventet_bruk_torr,forventet_bruk_vat,saltrester,
                                                                          material_type,friktion,vegtemp,lufttemp,luftfukt,vegforhold,vaerforhold,skydekke,
                                                                          sensorer_paskrudd, vegref,next_vegref,hovel_nede_bool,midskjer_nede_bool,sideplog_bruk_bool,
-                                                                         mengd_torrt_veiesys,mengd_vatt_veiesys,segm_length])
+                                                                         mengd_torrt_veiesys,mengd_vatt_veiesys,segm_length,seg_time,seg_dry_salt,seg_solution,seg_teodrysalt,seg_teowetsalt,flag])
 
                     else: #if line status=end, then those parameters will not be connected to anything, and hence we won't need it.
                         pass
@@ -166,10 +223,18 @@ def parse_dau(filename,add_geometry=False):
 
                 
                 #conn.commit()
+                
                 line=nextline
-        df=pd.DataFrame(data,columns=['header_time','vehicleID','DAUCode','datetime','start_stop','start_lat','start_lon','end_lat','end_lon','total_distance',
-                                    'speed','dist_w_saltspreader_dry','spreading_width_dry','dosage_dry','prc_added_liquid_to_dry','total_theoretical_amount_dry',
-                                    'total_amount_liquid_in_dry','dry_spreading_active','plow_active','spreading_width_liquid','dosage_liquid','total_theoretical_amount_wet',
-                                    'dist_w_saltspreader_wet','wet_spreding_active','spreading_symmetry','expected_use_dry','expected_use_liquid','salt_residuals',
-                                    'material_code','friction','road_temp','air_temp','air_humidity','road_condition','weather_condition','cloud_cover','mounted_sensors','from_vegref','to_vegref','graderblade_active','midtskjaer_active','sideplog_active','dry_amount_weightsys','wet_amount_weightsys','segment_length'])	
+        df=pd.DataFrame(data,columns=['filename','header_time','vehicleID','DAUKod','Tid','start_stop','start_lat','start_lon','end_lat','end_lon','TotalDistans',
+                                    'Hastighet','TotalDistans_m_Torrspreder','Sprederbredde_Torr','Spredermengde_Torr','Befuktning_torrstoff_prc','TotalTeoretiskSaltmengde_Torr',
+                                    'TotalTeoretiskMengdeBefuktning','TorrsprederAktiv','PlogAktiv','Sprederbredde_Vat','Spredermengde_Vat','TotalTeoretiskSaltmengde_Vat',
+                                    'TotalDistans_m_Vatspreder','VatsprederAktiv','Spredesymmetri','ForvententBrukTorr','ForventetBrukVat','Saltresidual',
+                                    'MaterialType_kode','Friktion','VegTemperature','LuftTemperature','Luftfuktighet','road_condition','weather_condition','cloud_cover','mounted_sensors','from_vegref','to_vegref','graderblade_active','midtskjaer_active','sideplog_active','dry_amount_weightsys','wet_amount_weightsys','segment_length','SegmentTime','SegmentDrySalt','SegmentSolution','Segment_TheoDrySalt','Segment_TheoSolution','Flag'])	
+        
+        pd.set_option('use_inf_as_na', True)
+        #df[df.isnull()]=np.nan
+        df=df.where(pd.notnull(df), None)
+        #df.replace([np.inf, -np.inf],None, inplace=True)
+        #df.replace([np.nan],None, inplace=True)
+        #df.fillna(value=ara, inplace=True)
         return(df)
