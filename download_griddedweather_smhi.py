@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
-def download_griddedweather_smhi(from_datetime, to_datetime, prod, download_folder=''):
+def download_griddedweather_smhi(from_datetime, to_datetime, prod, download_folder='',time_delay=0):
     '''a funciton to download dridded weather data from SMHI open data. For details about the data,
     see https://opendata.smhi.se/apidocs/grid/index.html. Dates should be in datetime format'''
     import requests
     import untangle
     import datetime
-    #if type(from_datetime) is not datetime.datetime 
+    import os    
+    import time
+#if type(from_datetime) is not datetime.datetime 
     
     def prod2num(prod):
         switcher={'MESAN':'4',
@@ -21,7 +23,7 @@ def download_griddedweather_smhi(from_datetime, to_datetime, prod, download_fold
         t_iter+=datetime.timedelta(days=1)
     #Builds request urls, make the request and reads filenames from response 
     dtype=prod2num(prod) #MESAN-A
-    downdownloaded_files=[]
+    downloaded_files=[]
     for d in dates:
         req_url=base_url+dtype+'/'+str(d.year)+'/'+str(d.month)+'/'+str(d.day)
         r=requests.get(req_url)
@@ -34,8 +36,9 @@ def download_griddedweather_smhi(from_datetime, to_datetime, prod, download_fold
                 #print(mod_time)
         for date in links:
             req_file=requests.get(links[date],stream=True)
-            filename=download_folder+prod+'_'+datetime.datetime.strftime(date,'%Y%m%d_%H%M')+'.grib' 
-            open(filename, 'wb').write(req_file.content)
+            filename=prod+'_'+datetime.datetime.strftime(date,'%Y%m%d_%H%M')+'.grib' 
+            open(os.path.join(download_folder,filename), 'wb').write(req_file.content)
             downloaded_files.append(filename)
+            time.sleep(time_delay)
     return(downloaded_files)
             
